@@ -1,0 +1,408 @@
+---
+title: "2016 NBA Draft Scouting Reports Text Analysis"
+author: "Eric Trempe"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+library(tidytext)
+library(tidyverse)
+library(wordcloud)
+library(kableExtra)
+```
+
+I was interested in comparing the pre-draft scouting reports of different levels of players in the NBA today. I split players drafted in 2016 into four different categories: All-Star players, Starter level players (players who get around 30+ minutes per game), role players who are still in the NBA but do not play very much, and players who are no longer active in the league (they have either retired, remained unsigned, or moved to another pro league). I decided to do text analysis on these scouting reports for the different groups to see if there are indicators of success hidden in these reports.
+
+```{r, warning=FALSE}
+# Reading in scouting reports and creating stop words
+all_stars_raw <- read.table(file = "C:\\Users\\dtrem\\Documents\\STAT 490\\final-ertrempe\\Data files\\All Star Scouting Reports.txt", header = FALSE, sep = ".", quote = "", comment.char = "")
+all_stars_raw <- t(all_stars_raw)
+
+starters_raw <- read.table(file = "C:\\Users\\dtrem\\Documents\\STAT 490\\final-ertrempe\\Data files\\Starter Scouting Reports.txt", header = FALSE, sep = ".", quote = "", comment.char = "")
+starters_raw <- t(starters_raw)
+
+in_league_raw <- read.table(file = "C:\\Users\\dtrem\\Documents\\STAT 490\\final-ertrempe\\Data files\\In League Scouting Reports.txt", header = FALSE, sep = ".", quote = "", comment.char = "")
+in_league_raw <- t(in_league_raw)
+
+out_of_league_raw <- read.table(file = "C:\\Users\\dtrem\\Documents\\STAT 490\\final-ertrempe\\Data files\\Out of League Scouting Reports.txt", header = FALSE, sep = ".", quote = "", comment.char = "")
+out_of_league_raw <- t(out_of_league_raw)
+
+my_stopwords <- tibble(word = c("nba","ball","game","season","sabonis","beasley","simmons","ingram","one","can","will","hield","buddy","ben","dunn","brandon","poeltl","murray","poeltl's","jamal","beasley's","zubac","brown","jones","ability","minutes","porzingis","bender","yabusele","zimmerman","onuaku","baldwin","draft","player","players","chriss","valentine","dunn's","ingram's","jaylen","brown's","projected","karnowski","reportedly","johnson's","playing","plays","40","13","14","court","level","12","pac","9","â","leks","2014","15","sports","draftexpress","summit"))
+```
+
+I started by finding the most common words and pairings of two words used in scouting reports for players of each category. I was hoping to find traits that do not always show up in traditional statistics that impact winning. Since these traits would not show up in other statistics, text analysis provides another opportunity for analyzing player impact and what makes a player successful. The tables and associated word clouds provide counts of 15 most common and meaningful words and phrases in each group of players. 
+
+## All-Star Players
+
+```{r}
+all_stars <- as.data.frame(all_stars_raw) %>%
+  rename(text = V1) %>%
+  mutate(text = str_replace_all(text, "[(]", " ")) %>%
+  mutate(text = str_replace_all(text, ",", " ")) %>%
+  mutate(text = str_replace_all(text, "[)]", " ")) %>%
+  mutate(text = str_replace_all(text, "-", " "))
+```
+
+```{r}
+all_stars_words <- all_stars %>%
+  unnest_tokens(word, text)
+
+all_stars_bigrams <- all_stars %>%
+  unnest_tokens(bigrams, text, token = "ngrams", n = 2)
+```
+
+```{r}
+all_stars_word_counts <- all_stars_words %>%
+  count(word, sort = TRUE)
+
+all_stars_word_counts <- all_stars_word_counts %>%
+  anti_join(stop_words, by = "word") %>%
+  anti_join(my_stopwords, by = "word")
+
+all_stars_bigram_counts <- all_stars_bigrams %>%
+  count(bigrams, sort = TRUE)
+
+all_stars_bigram_counts <- all_stars_bigram_counts %>%
+  separate(bigrams, into = c("first","second"), sep = " ", remove = FALSE) %>%
+  anti_join(stop_words, by = c("first" = "word")) %>%
+  anti_join(my_stopwords, by = c("first" = "word")) %>%
+  anti_join(stop_words, by = c("second" = "word")) %>%
+  anti_join(my_stopwords, by = c("second" = "word"))
+```
+
+```{r}
+all_stars_word_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+all_stars_word_counts %>%
+  with(wordcloud(word, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(4,0.5)))
+```
+
+There are a few NBA game related words that stick out from this word cloud including scoring, rebounds, shot(s), and attempts. These make sense because players who found All-Star level success in the NBA are typically strong scorers and/or rebounders. Shot and attempts also makes sense because star players typically take and make more shots during a game. Length is another word that stuck out to me because in the modern NBA, having long arms and height (commonly referred to as length by the NBA crowd) are very helpful traits to avoid defenders and defend others at a high level. College and freshman were also meaningful because many top draft picks are players declaring for the NBA after one college season in the NCAA. This is because of the rules regarding entering the draft that require players to have either on year of college or alternate league play before they are eligible for the draft. As a result the best players typically declare for the draft after their freshman season because they will get drafted early and can then make a lot of money.
+
+```{r}
+all_stars_bigram_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  select(bigrams,n) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+all_stars_bigram_counts %>%
+  with(wordcloud(bigrams, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(3,0.5)))
+```
+
+The bigrams were even more telling because they give more context. Physical tools relates to length from the prior cloud, college shows up once again, and scoring instincts is related to score and shots from the single word cloud as well. Fundamentally sound, excellent footwork, and jump shot were all in there as well as basketball related skills that would stick out in elite players. However, there was a negative sounding trait that stuck out in this cloud: mechanical issues. This is interesting because you would think that players who turn out to be All Stars in the NBA would have good mechanics. It could be something that was a concern but then rectified thanks to these other positive traits. Finally, forward position and power forwards showed up which is interesting because that is only one specific position in basketball. I think that many of the people from this group in this specific draft class played that position so that could be an anomaly for All Stars in general. 
+
+## Starter Level Players
+
+```{r}
+starters <- as.data.frame(starters_raw) %>%
+  rename(text = V1) %>%
+  mutate(text = str_replace_all(text, "[(]", " ")) %>%
+  mutate(text = str_replace_all(text, ",", " ")) %>%
+  mutate(text = str_replace_all(text, "[)]", " ")) %>%
+  mutate(text = str_replace_all(text, "-", " "))
+```
+
+```{r}
+starters_words <- starters %>%
+  unnest_tokens(word, text)
+
+starters_bigrams <- starters %>%
+  unnest_tokens(bigrams, text, token = "ngrams", n = 2)
+```
+
+```{r}
+starters_word_counts <- starters_words %>%
+  count(word, sort = TRUE)
+
+starters_word_counts <- starters_word_counts %>%
+  anti_join(stop_words, by = "word") %>%
+  anti_join(my_stopwords, by = "word")
+
+starters_bigram_counts <- starters_bigrams %>%
+  count(bigrams, sort = TRUE)
+
+starters_bigram_counts <- starters_bigram_counts %>%
+  separate(bigrams, into = c("first","second"), sep = " ", remove = FALSE) %>%
+  anti_join(stop_words, by = c("first" = "word")) %>%
+  anti_join(my_stopwords, by = c("first" = "word")) %>%
+  anti_join(stop_words, by = c("second" = "word")) %>%
+  anti_join(my_stopwords, by = c("second" = "word"))
+```
+
+```{r}
+starters_word_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+starters_word_counts %>%
+  with(wordcloud(word, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(4,0.5)))
+```
+
+Once again for the starter level solid NBA players, shooting, scoring, and shots were all commonly used. Scoring is a very important in the modern NBA so these traits would lead to success in the NBA. College is once again present, and team is very prevalent for this cloud which suggests these players are team oriented which would obviously be considered a positive trait and contribute to NBA sucess. Size was in this time instead of length but that tells a similar story. One large difference here is that many of these players were guards since that showed up instead of forwards like the All Star group.
+
+```{r}
+starters_bigram_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  select(bigrams,n) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+starters_bigram_counts %>%
+  with(wordcloud(bigrams, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(3,0.5)))
+```
+
+The main new bigram of note is the top 100 which was the most common bigram in the cloud. I believe that based on what I read in the individual reports, this is referring to top 100 recruits coming out of high school. This means that many of these starter level players were high recruits going in to college which makes sense. In addition to college basketball now there are two other leagues of play (plus national team play) that show up in the cloud. Adriatic league and Serbian league both appear which means this group had some international draft prospects. While these words are less prevalent for this group than NCAA college basketball, there is more diversity in which league the players came from before the draft. Another key phrase in there is marked improvement, which I think makes sense because many of these players were drafted in the middle of the first round, which means they were not expected to be high level players, but they showed improvement in the past and must have again to become this starter level player in the NBA.
+
+## Players Still in the NBA
+
+```{r}
+in_league <- as.data.frame(in_league_raw) %>%
+  rename(text = V1) %>%
+  mutate(text = str_replace_all(text, "[(]", " ")) %>%
+  mutate(text = str_replace_all(text, ",", " ")) %>%
+  mutate(text = str_replace_all(text, "[)]", " ")) %>%
+  mutate(text = str_replace_all(text, "-", " "))
+```
+
+```{r}
+in_league_words <- in_league %>%
+  unnest_tokens(word, text)
+
+in_league_bigrams <- in_league %>%
+  unnest_tokens(bigrams, text, token = "ngrams", n = 2)
+```
+
+```{r}
+in_league_word_counts <- in_league_words %>%
+  count(word, sort = TRUE)
+
+in_league_word_counts <- in_league_word_counts %>%
+  anti_join(stop_words, by = "word") %>%
+  anti_join(my_stopwords, by = "word")
+
+in_league_bigram_counts <- in_league_bigrams %>%
+  count(bigrams, sort = TRUE)
+
+in_league_bigram_counts <- in_league_bigram_counts %>%
+  separate(bigrams, into = c("first","second"), sep = " ", remove = FALSE) %>%
+  anti_join(stop_words, by = c("first" = "word")) %>%
+  anti_join(my_stopwords, by = c("first" = "word")) %>%
+  anti_join(stop_words, by = c("second" = "word")) %>%
+  anti_join(my_stopwords, by = c("second" = "word"))
+```
+
+```{r}
+in_league_word_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+in_league_word_counts %>%
+  with(wordcloud(word, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(4,0.5)))
+```
+
+These players have spent there careers as more of role players so role being one of the most common words from these scouting reports makes perfect sense in their projections. There are still lots of positive remarks about these players like impressive and team, but some of the words from earlier like excellent and sound are less common for these players as opposed to the more star level players.
+
+```{r}
+in_league_bigram_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  select(bigrams,n) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+in_league_bigram_counts %>%
+  with(wordcloud(bigrams, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(3,0.5)))
+```
+
+This cloud returns to a similar place as the earlier two, so even though these players did not enjoy quite as much success in the NBA, they had a lot of the same traits coming in the NBA draft. College basketball is very common while the other pro leagues from overseas do not appear in this cloud, so much of this group is from the United States NCAA pool of players.
+
+## Players No Longer in the NBA
+
+```{r}
+out_of_league <- as.data.frame(out_of_league_raw) %>%
+  rename(text = V1) %>%
+  mutate(text = str_replace_all(text, "[(]", " ")) %>%
+  mutate(text = str_replace_all(text, ",", " ")) %>%
+  mutate(text = str_replace_all(text, "[)]", " ")) %>%
+  mutate(text = str_replace_all(text, "-", " "))
+```
+
+```{r}
+out_of_league_words <- out_of_league %>%
+  unnest_tokens(word, text)
+
+out_of_league_bigrams <- out_of_league %>%
+  unnest_tokens(bigrams, text, token = "ngrams", n = 2)
+```
+
+```{r}
+out_of_league_word_counts <- out_of_league_words %>%
+  count(word, sort = TRUE)
+
+out_of_league_word_counts <- out_of_league_word_counts %>%
+  anti_join(stop_words, by = "word") %>%
+  anti_join(my_stopwords, by = "word")
+
+out_of_league_bigram_counts <- out_of_league_bigrams %>%
+  count(bigrams, sort = TRUE)
+
+out_of_league_bigram_counts <- out_of_league_bigram_counts %>%
+  separate(bigrams, into = c("first","second"), sep = " ", remove = FALSE) %>%
+  anti_join(stop_words, by = c("first" = "word")) %>%
+  anti_join(my_stopwords, by = c("first" = "word")) %>%
+  anti_join(stop_words, by = c("second" = "word")) %>%
+  anti_join(my_stopwords, by = c("second" = "word"))
+```
+
+```{r}
+out_of_league_word_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+out_of_league_word_counts %>%
+  with(wordcloud(word, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(4,0.5)))
+```
+
+The main word that sticks out to me in this group is potential. Players are always drafted because the organizations believe they have potential to contribute to winning games. While potential is certainly not a negative thing, the use of it in these scouting reports rather than focusing on positive skills might be somewhat indicative of why they did not make it in the league for as long. Some of these players were still drafted very early on in 2016 but they did not appear to reach their potential, which could be partially because they were behind their draft classmates in other areas highlighted by the earlier word cloud. Another really interesting part of this cloud that differs from the others is defensive. There is an old saying "Defense wins championships" but based on this study it seems as though offense is valued more in the NBA right now. The first three groups had more words relating to shooting, scoring, and free throws, but this group had defensive and post and perimeter (which imply defense). 
+
+```{r}
+out_of_league_bigram_counts %>%
+  top_n(15, wt = n) %>%
+  arrange(desc(n)) %>%
+  select(bigrams,n) %>%
+  kable()
+```
+
+```{r}
+set.seed(1234)
+out_of_league_bigram_counts %>%
+  with(wordcloud(bigrams, n, max.words = 15, random.order = FALSE, random.color = FALSE, colors = brewer.pal(15, "Dark2"), scale = c(3,0.5)))
+```
+
+The bigram cloud has a few more offensive related traits like jump shots, but defensive glass (defensive rebounding) is once again big as well as another component of defense, shot blocker. But, what really sticks out from this cloud is the return of the Adriatic league. This other pro league is much more common for this group than college so many of these players had a different background before the NBA. This suggests that this pro league is less effective in preparing players for successful NBA careers as opposed to the NCAA college basketball system.
+
+Overall, these word clouds had many similarities among groups. There were, however, some key differences that provide some insight into potential differences between these players. Intangibles are often described as ways a player affects the game that do not show up in statistics. Scouting reports are meant in part to describe these intangibles so this analysis shows how some of these traits affect NBA success. 
+
+## Sentiment Analysis
+
+I also wanted to analyze the connotation of the words used in these scouting reports for each group of players. There could be a difference in how the scouts write about the players who wind up finding success in the NBA versus those who do not even though it is unknown at the time of the writing. I started this by simply summing the sentiments of the words in scouting reports from each player category.
+
+```{r}
+sentiments <- get_sentiments("afinn")
+```
+
+All Star Players Sentiment Sum:
+
+```{r}
+all_stars_word_counts <- all_stars_word_counts %>%
+  mutate(linenumber = row_number()) 
+
+all_stars_sentiments <- all_stars_word_counts %>%
+  filter(n > 2) %>%
+  inner_join(sentiments, by = "word") %>%
+  mutate(index = linenumber)
+
+all_stars_sentiments_summarized <- all_stars_sentiments %>%
+  group_by(index) %>%
+  summarize(sentimentavg = mean(value))
+sum(all_stars_sentiments_summarized$sentimentavg)
+```
+
+Starter Level Players Sentiment Sum:
+
+```{r}
+starters_word_counts <- starters_word_counts %>%
+  mutate(linenumber = row_number()) 
+
+starters_sentiments <- starters_word_counts %>%
+  filter(n > 2) %>%
+  inner_join(sentiments, by = "word") %>%
+  mutate(index = linenumber)
+
+starters_sentiments_summarized <- starters_sentiments %>%
+  group_by(index) %>%
+  summarize(sentimentavg = mean(value))
+
+sum(starters_sentiments_summarized$sentimentavg)
+```
+
+Players Still in the NBA Sentiment Sum:
+
+```{r}
+in_league_word_counts <- in_league_word_counts %>%
+  mutate(linenumber = row_number()) 
+
+in_league_sentiments <- in_league_word_counts %>%
+  filter(n > 2) %>%
+  inner_join(sentiments, by = "word") %>%
+  mutate(index = linenumber)
+
+in_league_sentiments_summarized <- in_league_sentiments %>%
+  group_by(index) %>%
+  summarize(sentimentavg = mean(value))
+
+sum(in_league_sentiments_summarized$sentimentavg)
+```
+
+Players No Longer in the NBA Sentiment Sum:
+
+```{r}
+out_of_league_word_counts <- out_of_league_word_counts %>%
+  mutate(linenumber = row_number()) 
+
+out_of_league_sentiments <- out_of_league_word_counts %>%
+  filter(n > 2) %>%
+  inner_join(sentiments, by = "word") %>%
+  mutate(index = linenumber)
+
+out_of_league_sentiments_summarized <- out_of_league_sentiments %>%
+  group_by(index) %>%
+  summarize(sentimentavg = mean(value))
+
+sum(out_of_league_sentiments_summarized$sentimentavg)
+```
+
+The sentiment sums for the players still in the NBA today (including the All Star and Starter Level players) were very similar, which suggests that their scouting reports had a very similar proportion of positive and negative words. I found that interesting because while level of success has varied among these groups, they have still all managed to stay active in the NBA for 6 years which is impressive. Perhaps this level of positive vs negative words is the bar for finding some success in the NBA.
+
+I found it especially interesting that the players that are out of the NBA had a lower sentiment sum. The sum (33) was still positive, meaning more positive words than negative, but it was less positive than the others. Even though some of these players were highly sought after and projected to be NBA stars, they still, on average, had less positive scouting reports about them. Having less positive words, or more negative words, could represent red flags that in some way contributed to less NBA success.
+
+```{r}
+legend_colors <- c("All Stars" = "black","Starters" = "red", "Still in NBA" = "blue", "Out of NBA" = "green")
+
+ggplot() + geom_col(data = all_stars_sentiments_summarized, aes(x = index, y = sentimentavg, fill = "All Stars")) +
+  geom_col(data = starters_sentiments_summarized, aes(x = index, y = sentimentavg, fill = "Starters")) +
+  geom_col(data = in_league_sentiments_summarized, aes(x = index, y = sentimentavg, fill = "Still in NBA")) +
+  geom_col(data = out_of_league_sentiments_summarized, aes(x = index, y = sentimentavg, fill = "Out of NBA")) +
+  labs(y = "Sentiment Average", fill = "Legend") +
+  scale_fill_manual(values = legend_colors)
+```
+
+This graph tells this same story visually. All four colors have mostly positive sentiments, but it is clear that there are more green lines below zero which makes sense considering the players no longer in the NBA have a lower sentiment sum. As one would expect, more positivity in a scouting report generally correlates to a longer and more illustrious career in the NBA. The key here is that all the players remaining in the league (no matter the level of play) had roughly the same sentiment "scores," and one that was better than their counterparts who did not enjoy the same success in the NBA.
